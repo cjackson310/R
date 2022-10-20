@@ -1,0 +1,260 @@
+---
+Title: "Cyclistic Bike-Sharing Study"
+Author: Christie Jackson
+Date: 9/20/22
+Output: html_notebook
+---
+
+## Intro
+
+###### Hello! I have recently completed the Google Data Analytics certificate program through Coursera.  In the last course, students are asked to complete a Capstone project to showcase the skills learned. For this case study, I used R studio for the data preparation, analysis, and visualization.
+
+## Background
+
+###### I am a junior data analyst on the marketing team, working for Cyclistic, a successful bike-sharing fictional business launched in Chicago in 2016.
+###### Our finance analysts have concluded that annual members are more profitable than casual riders.
+###### Lily Moreno, our director of marketing and manager, believes there's a chance to convert casual riders to members.
+
+## Ask:
+
+###### In order to achieve this goal, the marketing analyst team needs to better understand how annual members and casual riders differ..
+
+###### There are three questions that will guide the future marketing program:
+  * How do annual members and casual riders use Cyclistic bikes      differently?
+  * Why would casual riders buy Cyclistic annual membership?
+  * How can Cyclistic use digital media to influence casual riders to become members?
+  
+###### I have been assigned the first question to answer.
+
+## Prepare
+
+###### Cyclistic has made historical trip datasets available.  (Note: The datasets have a different name because Cyclistic is a fictional company. For the purposes of this case study. The data has been made available by Motivate International Inc. under this license <https://ride.divvybikes.com/data-license-agreement>). Analysis for this case study is made using data from January 2019 to December 2019, divided into four quarters.
+
+###### I chose to use R because it enables me to prepare, analyze, and visualize the data, all on the same platform. 
+
+#Setting up my environment
+
+```{r}
+install.packages("tidyverse") #for data import and wrangling
+install.packages("lubridate") #for date functions
+install.packages("readxl") #for reading Excel 
+install.packages("dplyr") # for data manipulation
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(readxl)
+library(dplyr)
+```
+
+#get working directory
+
+```{r}
+getwd()
+```
+
+#upload data sets (.xls)
+
+```{r}
+Divvy_Trips_2019_Q1 <- read_excel("Cyclistic Trip Data 2019/Divvy_Trips_2019_Q1.xls")
+```
+
+```{r}
+Divvy_Trips_2019_Q2 <- read_excel("Cyclistic Trip Data 2019/Divvy_Trips_2019_Q2.xls")
+```
+
+```{r}
+Divvy_Trips_2019_Q3 <- read_excel("Cyclistic Trip Data 2019/Divvy_Trips_2019_Q3.xls")
+```
+
+```{r}
+Divvy_Trips_2019_Q4 <- read_excel("Cyclistic Trip Data 2019/Divvy_Trips_2019_Q4.xls")
+```
+
+#compare column names
+
+```{r}
+colnames(Divvy_Trips_2019_Q1)
+colnames(Divvy_Trips_2019_Q2)
+colnames(Divvy_Trips_2019_Q3)
+colnames(Divvy_Trips_2019_Q4)
+```
+
+#insect data frames and look for incongruencies
+
+```{r}
+str(Divvy_Trips_2019_Q1)
+str(Divvy_Trips_2019_Q2)
+str(Divvy_Trips_2019_Q3)
+str(Divvy_Trips_2019_Q4)
+```
+
+#stack quarter frames into one frame
+
+```{r}
+all_trips <- bind_rows(Divvy_Trips_2019_Q1, Divvy_Trips_2019_Q2, Divvy_Trips_2019_Q3, Divvy_Trips_2019_Q4)
+```
+
+## Process
+
+#inspect new table
+
+```{r}
+colnames(all_trips) #list of column names
+dim(all_trips) #dimensions of data frame
+head(all_trips) #see the first 6 rows of data frame; also tail(all_trips)
+str(all_trips) #see list of columns and data types
+summary(all_trips)#statistical summary of data
+```
+
+#see how many observations fall under each usertype 
+
+```{r}
+table(all_trips$usertype)
+```
+
+#in the "usertype" column, replace "Subscriber" with "member" and "Customer" with "casual"
+
+```{r}
+all_trips <- all_trips %>%
+  mutate(usertype = recode(usertype, "Subscriber" = "Member", "Customer" = "Casual"))
+```
+
+#check to make sure observations were properly changed
+
+```{r}
+table(all_trips$usertype)
+```
+
+#add columns that list the date, month, day, and year of each ride
+#this will allow us to aggregate ride data for each month, day, or year 
+
+```{r}
+all_trips$date<-as.Date(all_trips$start_time)
+all_trips$month<-format(as.Date(all_trips$date),"%m")
+all_trips$day <- format(as.Date(all_trips$date), "%Y")
+all_trips$day <- format(as.Date(all_trips$date),'%d' )
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <-format(as.Date(all_trips$date),"%A")
+```
+
+#inspect structure of columns
+
+```{r}
+str(all_trips)
+```
+
+#convert "ride_length" from Factor to numeric so we can run calculations on the data
+
+```{r}
+is.factor(all_trips$ride_length)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+is.numeric(all_trips$ride_length)
+```
+
+#add a "ride_length" calculation to all_trips (in minutes & seconds)
+
+```{r}
+all_trips$ride_length <- difftime(all_trips$end_time, all_trips$start_time)
+```
+
+#remove bad data and create new data frame
+#the dataframe includes a few hundred entries when bikes were taken out of docks and checked for quality by Divvy or ride_length was negative
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$from_station_name == "HQ QR" | all_trips$ride_length<0),]
+```
+
+## Analyze
+
+#descriptive analysis on ride_length(all figures in minutes & seconds)
+
+```{r}
+mean(all_trips_v2$ride_length)
+median(all_trips_v2$ride_length)
+max(all_trips_v2$ride_length)
+min(all_trips_v2$ride_length)
+```
+
+#condense the four lines above to one line using summary() on the specific attribute
+
+```{r}
+summary(all_trips_v2$ride_length)
+```
+
+#compare members and casual users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$usertype, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$usertype, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$ride_length, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$ride_length, FUN = min)
+```
+
+#See the average ride time by each day for members vs casual users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$usertype + all_trips_v2$day_of_week, FUN = mean)
+```
+
+#fix the order of the days
+
+```{r}
+all_trips_v2$day_of_week <-ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+#run average ride time by each day for member vs casual users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$usertype +
+            all_trips_v2$day_of_week, FUN = mean)
+```
+
+#analyze ridership data by type and weekday
+
+```{r}
+all_trips_v2 %>% 
+  mutate(weekday = wday(start_time, label = TRUE)) %>%  #creates weekday field using wday()
+  group_by(usertype, day_of_week) %>%  #groups by usertype and weekday
+  summarise(number_of_rides = n()		#calculates the number of rides and average duration 
+            ,average_duration = mean(ride_length)) %>% 	# calculates the average duration
+  arrange(usertype, day_of_week)	# sorts
+```
+
+#create a visualization the number of rides by rider type
+
+```{r}
+all_trips_v2 %>% 
+    mutate(day_of_week = wday(start_time, label = TRUE)) %>% 
+   group_by(usertype, day_of_week) %>%
+   summarise(number_of_rides = n()
+              ,average_duration = mean(ride_length)) %>% 
+     arrange(usertype, day_of_week)  %>% 
+     ggplot(aes(x = day_of_week, y = number_of_rides, fill = usertype)) +
+     geom_col(position = "dodge")
+```
+
+#create a visualization for average duration
+
+```{r}
+all_trips_v2 %>% 
+  mutate(day_of_week = wday(start_time, label = TRUE)) %>% 
+  group_by(usertype, day_of_week) %>% 
+  dplyr::summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(usertype, day_of_week)  %>% 
+  ggplot(aes(x = day_of_week, y = average_duration, fill = usertype)) +
+  geom_col(position = "dodge")
+```
+## Share
+
+#create a csv file that we will visualize in Excel, Tableau, or presentation software
+
+```{r}
+counts <- aggregate(all_trips_v2$ride_length ~ all_trips_v2$usertype + all_trips_v2$day_of_week, FUN = mean)
+write.csv(counts, file = "10.14 >> Users >> christiejackson >> Documents >> avg_ride_length.csv")
+```
+
+
+
